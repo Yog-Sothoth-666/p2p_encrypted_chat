@@ -1,0 +1,12 @@
+# cryptography: Required for RSA, AES-GCM, and HMAC primitives
+cryptography>=41.0.0
+
+# protobuf: Required for serializing messages before network transmission
+protobuf>=4.24.0
+
+# websockets: Required for the P2P communication layer
+websockets>=11.0.0
+
+# pytest suite: Required for Quality Assurance and End-to-End testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
