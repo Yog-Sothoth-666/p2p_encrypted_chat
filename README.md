@@ -38,3 +38,31 @@ Run the following command to install the required cryptographic and networking l
 
 ## Running the Application
 *(Instructions to be added once `main.py` is implemented)*
+
+## 📂 File Ownership & Work Boundaries
+To completely avoid Git merge conflicts, team members must only edit the files assigned to their role unless agreed upon in a meeting.
+
+* **Person 1 (Crypto Core):** Owns `src/crypto_utils.py` and `tests/test_crypto.py`.
+* **Person 2 (Network):** Owns `src/network.py` and assists with `protos/message.proto`.
+* **Person 3 (Protocol):** Owns `src/session_manager.py` and `main.py`.
+* **Person 4 (Storage & QA):** Owns `src/storage.py`, `protos/message.proto`, and all End-to-End tests in the `tests/` directory.
+
+## 🔄 Team Git Workflow
+We are using a feature-branch workflow. Do not push directly to `master`.
+
+1. **Pull the latest code:** `git pull origin master`
+2. **Create a branch for your task:** `git checkout -b feature/your-name-task` (e.g., `feature/yahya-rsa-keys`)
+3. **Commit your work:** `git commit -m "feat: added RSA generation"`
+4. **Push your branch:** `git push -u origin feature/your-name-task`
+5. **Review:** Let the team know your branch is ready to be merged into `master`.
+
+## 🧪 Quality Assurance & Testing
+This project uses `pytest` to ensure cryptographic integrity and network reliability.
+
+To run the entire test suite:
+`pytest tests/ -v`
+
+To test a specific module (e.g., cryptography):
+`pytest tests/test_crypto.py -v`
+
+
