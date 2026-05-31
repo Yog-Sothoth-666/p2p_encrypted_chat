@@ -28,7 +28,8 @@ It is highly recommended to use a virtual environment to isolate the project dep
 `python -m venv venv`
 
 **3. Activate the environment**
-* On Linux: `source venv/bin/activate`
+* On Debian: `source venv/bin/activate`
+* On Cachy: `source venv/bin/activate.fish`
 * On Windows: `venv\Scripts\activate`
 
 **4. Install dependencies**
