@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+message P2PMessage {
+  // Define what kind of message this is
+  enum MessageType {
+    UNKNOWN = 0;
+    RSA_PUB_KEY = 1;
+    AES_KEY_EXCHANGE = 2;
+    CHAT_MESSAGE = 3;
+  }
+
+  MessageType type = 1;      // Tells the FSM what state it should be in
+  
+  bytes payload = 2;         // The actual data (Public Key, Encrypted AES key, or Ciphertext)
+  
+  bytes nonce = 3;           // Required for AES-GCM
+  bytes hmac_tag = 4;        // Required for integrity verification
+}
