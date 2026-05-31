@@ -1,0 +1,18 @@
+# Environnements virtuels Python
+venv/
+env/
+.env
+
+# Fichiers de cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Fichiers de base de données et logs locaux (Spécifique à votre projet)
+*.log
+*.sqlite3
+*.db
+
+# Fichiers systèmes
+.DS_Store
+Thumbs.db
