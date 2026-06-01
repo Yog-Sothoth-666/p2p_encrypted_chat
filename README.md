@@ -19,22 +19,35 @@ This project is divided into four distinct development domains:
 
 ## Installation Instructions
 
-**1. Clone the repository**
+# 1. Clone the repository
 Ensure you have Git installed, then clone the project to your local machine:
-`git clone [YOUR_REPOSITORY_URL_HERE]`
-
-**2. Create a virtual environment**
+```bash
+git clone https://github.com/Yog-Sothoth-666/p2p_encrypted_chat.git
+cd p2p_encrypted_chat
+```
+# 2. Create a virtual environment
 It is highly recommended to use a virtual environment to isolate the project dependencies.
-`python -m venv venv`
-
-**3. Activate the environment**
-* On Debian: `source venv/bin/activate`
-* On Cachy: `source venv/bin/activate.fish`
-* On Windows: `venv\Scripts\activate`
-
-**4. Install dependencies**
+```bash
+python -m venv venv
+```
+# 3. Activate the environment
+## macOS / Linux
+```bash
+source venv/bin/activate
+```
+## Windows (Command Prompt)
+```cmd
+venv\Scripts\activate.bat
+```
+## Windows (PowerShell)
+```powershell
+.\venv\Scripts\Activate.ps1
+``` 
+# 4. Install dependencies
 Run the following command to install the required cryptographic and networking libraries:
-`pip install -r requirements.txt`
+```bash
+pip install -r requirements.txt
+```
 
 ## Running the Application
 *(Instructions to be added once `main.py` is implemented)*
