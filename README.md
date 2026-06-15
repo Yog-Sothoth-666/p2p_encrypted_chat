@@ -50,7 +50,42 @@ pip install -r requirements.txt
 ```
 
 ## Running the Application
-*(Instructions to be added once `main.py` is implemented)*
+
+### Quick Start (Two Terminals)
+
+**Terminal 1 - Receiver:**
+```bash
+python main.py --role receiver --my-port 9999 --peer-address localhost --peer-port 9998
+```
+
+**Terminal 2 - Initiator:**
+```bash
+python main.py --role initiator --my-port 9998 --peer-address localhost --peer-port 9999
+```
+
+### With Custom Log File
+```bash
+python main.py --role initiator --my-port 9998 --peer-address localhost --peer-port 9999 --log-file alice_chat.bin
+python main.py --role receiver --my-port 9999 --peer-address localhost --peer-port 9998 --log-file bob_chat.bin
+```
+
+### Remote Chat (Different Machines)
+Replace `localhost` with the IP address of the receiver machine:
+```bash
+# On Receiver Machine (e.g., 192.168.1.100)
+python main.py --role receiver --my-port 9999 --peer-address <your-ip> --peer-port 9998
+
+# On Initiator Machine
+python main.py --role initiator --my-port 9998 --peer-address 192.168.1.100 --peer-port 9999
+```
+
+### Interactive Chat
+Once both peers connect and the handshake is complete:
+- Type your message and press Enter to send
+- Received messages appear with the "Peer:" prefix
+- Type `quit` to exit gracefully
+
+The chat history is automatically encrypted and saved to a local encrypted log file.
 
 ## 📂 File Ownership & Work Boundaries
 To completely avoid Git merge conflicts, team members must only edit the files assigned to their role unless agreed upon in a meeting.
