@@ -22,49 +22,42 @@ class P2PNetwork:
         self.outgoing_ws : Optional[websockets.WebsocketClientProtocol] = None # I → Peer
         self.incoming_ws: Optional[websockets.WebSocketServerProtocol] = None  # Peer → I
         self._is_running = False 
+        self._background_tasks = set()
 
-    
-    
     async def start(self):
-        print(f"[Network] 🚀 Starting P2P Node...")
-        print(f"[Network] 📡 I will listen on: ws://0.0.0.0:{self.my_port}")  # Listen on ALL interfaces
-        print(f"[Network] 🔌 I will connect to: ws://{self.peer_address}:{self.peer_port}")  # ✅ Use peer_address
+        """Start the server and attempt to connect to the peer."""
+        if self.server is None:
+            # Start server on 0.0.0.0 (all interfaces)
+            self.server = await websockets.serve(self._handle_incoming, "0.0.0.0", self.my_port)
+            self._is_running = True
 
-        # Start server on 0.0.0.0 (all interfaces)
-        self.server = await websockets.serve(self._handle_incoming, "0.0.0.0", self.my_port)
-        print("[Network] ✅ Server started")
+        if not self.outgoing_ws:
+            # Connect to peer
+            try:
+                # ✅ Use peer_address here too
+                self.outgoing_ws = await websockets.connect(f"ws://{self.peer_address}:{self.peer_port}")
+                task = asyncio.create_task(self._receive_loop(self.outgoing_ws, "outgoing"))
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
+            except Exception:
+                pass
 
-        # Connect to peer
-        await asyncio.sleep(0.5)
-        try:
-            # ✅ Use peer_address here too
-            self.outgoing_ws = await websockets.connect(f"ws://{self.peer_address}:{self.peer_port}")
-            print("[Network] ✅ Connected to peer")
-        except Exception as e:
-            print(f"[Network] ⚠️ Could not connect yet: {e}")
-            print("[Network]    Will keep trying when peer starts...")
+        if self._is_running:
+            pass
 
-        self._is_running = True
-        asyncio.create_task(self._receive_loop(self.outgoing_ws, "outgoing"))
-        print("[Network] 🟢 P2P network ready!\n")
-    
-    
-    
     async def _handle_incoming(self, websocket):  # ✅ Removed 'path'
         """Called automatically when peer connects to my server"""
         self.incoming_ws = websocket
-        print("[Network] 🤝 Peer connected to my server!")
         
-        asyncio.create_task(self._receive_loop(websocket, "incoming"))
+        task = asyncio.create_task(self._receive_loop(websocket, "incoming"))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
         
         try:
             await websocket.wait_closed()
         finally:
-            print("[Network] 🔌 Peer disconnected from my server")
             self.incoming_ws = None
 
-    
-    
     async def _receive_loop(self, websocket, connection_type: str):
         """Background task that constantly listens for messages"""
         if not websocket:
@@ -76,38 +69,40 @@ class P2PNetwork:
                 callback = self.on_message_callback(message, connection_type)
                 if asyncio.iscoroutine(callback):
                     await callback
-                # If it's not a coroutine, it's a sync function - already executed
-        except websockets.exceptions.ConnectionClosed:
-            print(f"[Network] 🔌 {connection_type} connection closed")
-        except Exception as e:
-            print(f"[Network] ⚠️ Error in {connection_type} receive: {e}")
+        except (websockets.exceptions.ConnectionClosed, asyncio.CancelledError):
+            pass
+        except Exception:
+            pass
         
-    
     async def send(self, data: bytes):
         """Send encrypted bytes to the peer"""
         if not self.outgoing_ws and not self.incoming_ws:
-            print("[Network]  Cannot send: No active connections")
             return
         
         # Try outgoing first, fallback to incoming
-        if self.outgoing_ws:
-            await self.outgoing_ws.send(data)
-        elif self.incoming_ws:
-            await self.incoming_ws.send(data)
+        try:
+            if self.outgoing_ws:
+                await self.outgoing_ws.send(data)
+            elif self.incoming_ws:
+                await self.incoming_ws.send(data)
+        except Exception:
+            pass
 
-    
-    
-    
     async def _default_handler(self, message: bytes, conn_type: str):
         """Default callback if Person 3 hasn't connected yet"""
-        print(f"[Network] 📥 Received {len(message)} bytes via {conn_type}")
+        pass
 
-    
-    
-    
     async def stop(self):
         """Clean shutdown"""
         self._is_running = False
+        
+        # Cancel all background tasks
+        for task in list(self._background_tasks):
+            task.cancel()
+        
+        if self._background_tasks:
+            await asyncio.gather(*self._background_tasks, return_exceptions=True)
+
         if self.outgoing_ws:
             await self.outgoing_ws.close()
         if self.incoming_ws:
@@ -115,4 +110,3 @@ class P2PNetwork:
         if self.server:
             self.server.close()
             await self.server.wait_closed()
-        print("[Network] 🔴 Network stopped")

@@ -6,8 +6,6 @@ from cryptography.hazmat.primitives import hashes, hmac, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-# Configures logging for cryptocore
-logging.basicConfig(level=logging.INFO, format='[CryptoCore] %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 class CryptoCore:
@@ -66,7 +64,7 @@ class CryptoCore:
         Generates a 256-bit AES key. This is the fast, single-use key 
         we will use to encrypt the actual chat messages.
         """
-        logger.info("Generating a fresh AES-256 session key...")
+        logger.debug("Generating a fresh AES-256 session key...")
         # AES-256 requires a 32-byte (256-bit) key
         return AESGCM.generate_key(bit_length=256)
 
@@ -75,7 +73,7 @@ class CryptoCore:
         Locks the fast AES session key inside the peer's RSA public padlock.
         Once encrypted, only the peer's private key can unlock it.
         """
-        logger.info("Encrypting the AES session key using the peer's RSA public key...")
+        logger.debug("Encrypting the AES session key using the peer's RSA public key...")
         
         # We use OAEP padding with SHA-256. This is the modern standard 
         # required to prevent padding oracle attacks against RSA.
@@ -96,7 +94,7 @@ class CryptoCore:
         if not self._private_key:
             raise RuntimeError("Critical: Cannot decrypt session key. Local RSA keys are missing.")
             
-        logger.info("Decrypting the received AES session key...")
+        logger.debug("Decrypting the received AES session key...")
         
         aes_key = self._private_key.decrypt(
             encrypted_aes_key,
@@ -115,7 +113,7 @@ class CryptoCore:
         Encrypts a standard string message using AES-GCM.
         Returns the (nonce, ciphertext) tuple needed by Person 3 to send over the network.
         """
-        logger.info("Encrypting outgoing text message...")
+        logger.debug("Encrypting outgoing text message...")
         
         # Initialize the AES-GCM cipher with the shared session key
         aesgcm = AESGCM(aes_key)
@@ -137,7 +135,7 @@ class CryptoCore:
         Decrypts an incoming message and validates its built-in GCM authentication tag.
         Throws an error if the message was altered in transit.
         """
-        logger.info("Decrypting incoming text message...")
+        logger.debug("Decrypting incoming text message...")
         aesgcm = AESGCM(aes_key)
         
         try:
@@ -163,7 +161,7 @@ class CryptoCore:
         if not self._private_key:
             raise RuntimeError("Cannot sign message: Local RSA keys are missing.")
             
-        logger.info("Signing outgoing data with RSA private key...")
+        logger.debug("Signing outgoing data with RSA private key...")
         
         # PSS (Probabilistic Signature Scheme) is the modern standard for RSA signatures
         signature = self._private_key.sign(
@@ -180,7 +178,7 @@ class CryptoCore:
         """
         Verifies that the signature matches the data and was created by the peer.
         """
-        logger.info("Verifying sender's RSA signature...")
+        logger.debug("Verifying sender's RSA signature...")
         try:
             peer_public_key.verify(
                 signature,
@@ -191,7 +189,7 @@ class CryptoCore:
                 ),
                 hashes.SHA256()
             )
-            logger.info("Signature is valid. Sender authenticated.")
+            logger.debug("Signature is valid. Sender authenticated.")
             return True
         except InvalidSignature:
             logger.error("SECURITY ALERT: Invalid RSA signature. Someone is spoofing the sender!")
@@ -202,7 +200,7 @@ class CryptoCore:
         Generates an HMAC-SHA256 tag for the given data using the shared AES key.
         Fulfills the specific project requirement for explicit integrity checks.
         """
-        logger.info("Generating HMAC-SHA256 tag for data integrity...")
+        logger.debug("Generating HMAC-SHA256 tag for data integrity...")
         
         h = hmac.HMAC(aes_key, hashes.SHA256())
         h.update(data)
@@ -212,13 +210,13 @@ class CryptoCore:
         """
         Recalculates the HMAC locally and checks if it matches what was sent over the network.
         """
-        logger.info("Verifying HMAC-SHA256 integrity tag...")
+        logger.debug("Verifying HMAC-SHA256 integrity tag...")
         
         h = hmac.HMAC(aes_key, hashes.SHA256())
         h.update(data)
         try:
             h.verify(expected_hmac)
-            logger.info("HMAC verified. Data is intact.")
+            logger.debug("HMAC verified. Data is intact.")
             return True
         except InvalidSignature:
             logger.error("SECURITY ALERT: HMAC verification failed. Data was tampered with!")

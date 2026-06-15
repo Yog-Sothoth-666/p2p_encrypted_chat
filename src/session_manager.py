@@ -21,7 +21,6 @@ from message_utils import pack_message, unpack_message
 import message_pb2
 from storage import SecureChatLogger
 
-logging.basicConfig(level=logging.INFO, format='[SessionManager] %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -106,33 +105,24 @@ class SessionManager:
         # Start the network
         while self.state == "INIT":
             await self.network.start()
-            await asyncio.sleep(1)
-
             if self.network.outgoing_ws or self.network.incoming_ws:
                 if self.role == "initiator":
                     self.state = "SEND_RSA_PUB"
                 else:
                     self.state = "WAIT_RSA_PUB"
             else:
-                print(f"[{self.role}] Waiting for peer to connect...")
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
 
         # Initiator: Send RSA public key
         if self.role == "initiator":
             while self.state != "ESTABLISHED":
                 if self.state == "SEND_RSA_PUB":
-                    print(f"\n[*] State Transition: SEND_RSA_PUB")
                     envelope = pack_message("RSA_PUB_KEY", payload_bytes=my_pub_key_bytes)
                     await self.network.send(envelope)
                     self.state = "WAIT_RSA_PUB"
-                    await asyncio.sleep(1)
 
                 elif self.state == "WAIT_RSA_PUB":
-                    print(f"\n[*] State Transition: WAIT_RSA_PUB")
-                    raw_incoming_bytes = await asyncio.wait_for(
-                        self.message_queue.get(), timeout=10
-                    )
-
+                    raw_incoming_bytes = await self.message_queue.get()
                     msg_type, payload, nonce, hmac = unpack_message(raw_incoming_bytes)
 
                     if msg_type == "RSA_PUB_KEY":
@@ -140,12 +130,9 @@ class SessionManager:
                         self.peer_public_key = self.crypto.load_remote_public_key(payload)
                         self.state = "GEN_AND_SEND_AES"
                     else:
-                        print(f"[!] Expected RSA key, but received {msg_type}. Dropping.")
-                    await asyncio.sleep(1)
+                        logger.warning(f"Expected RSA key, but received {msg_type}. Dropping.")
 
                 elif self.state == "GEN_AND_SEND_AES":
-                    print(f"\n[*] State Transition: GEN_AND_SEND_AES")
-
                     self.session_key = self.crypto.generate_session_key()
                     encrypted_aes_key = self.crypto.encrypt_session_key(
                         self.session_key, self.peer_public_key
@@ -155,17 +142,12 @@ class SessionManager:
                     await self.network.send(envelope)
 
                     self.state = "ESTABLISHED"
-                    await asyncio.sleep(1)
 
         # Receiver: Wait for RSA public key, send ours, then receive AES
         else:
             while self.state != "ESTABLISHED":
                 if self.state == "WAIT_RSA_PUB":
-                    print(f"\n[*] State Transition: WAIT_RSA_PUB")
-
-                    raw_incoming_bytes = await asyncio.wait_for(
-                        self.message_queue.get(), timeout=10
-                    )
+                    raw_incoming_bytes = await self.message_queue.get()
                     msg_type, payload, nonce, hmac = unpack_message(raw_incoming_bytes)
 
                     if msg_type == "RSA_PUB_KEY":
@@ -173,36 +155,22 @@ class SessionManager:
                         self.peer_public_key = self.crypto.load_remote_public_key(payload)
                         self.state = "SEND_RSA_PUB"
                     else:
-                        print(f"[!] Expected RSA key, but received {msg_type}. Dropping.")
-                    await asyncio.sleep(1)
+                        logger.warning(f"Expected RSA key, but received {msg_type}. Dropping.")
 
                 elif self.state == "SEND_RSA_PUB":
-                    print(f"\n[*] State Transition: SEND_RSA_PUB")
-
                     envelope = pack_message("RSA_PUB_KEY", payload_bytes=my_pub_key_bytes)
                     await self.network.send(envelope)
-
                     self.state = "WAIT_AES_KEY"
-                    await asyncio.sleep(1)
 
                 elif self.state == "WAIT_AES_KEY":
-                    print(f"\n[*] State Transition: WAIT_AES_KEY")
-
-                    raw_incoming_bytes = await asyncio.wait_for(
-                        self.message_queue.get(), timeout=10
-                    )
+                    raw_incoming_bytes = await self.message_queue.get()
                     msg_type, payload, nonce, hmac = unpack_message(raw_incoming_bytes)
 
                     if msg_type == "AES_KEY_EXCHANGE":
                         self.session_key = self.crypto.decrypt_session_key(payload)
                         self.state = "ESTABLISHED"
                     else:
-                        print(f"[!] Expected AES key, but received {msg_type}. Dropping.")
-                    await asyncio.sleep(1)
-
-        print(f"\n=== Handshake Complete ({self.role.upper()}) ===")
-        print(f"[*] Secure Session Key established")
-        print(f"[*] Ready for chat.\n")
+                        logger.warning(f"Expected AES key, but received {msg_type}. Dropping.")
 
     async def send_message(self, plaintext: str) -> None:
         """
@@ -238,7 +206,7 @@ class SessionManager:
         entry.signature_verified = True
         self.logger.log_entry(entry)
 
-        logger.info(f"Message sent: {plaintext[:50]}...")
+        logger.debug(f"Message sent: {plaintext[:50]}...")
 
     async def receive_message(self, timeout: int = 30) -> Optional[str]:
         """
@@ -258,7 +226,7 @@ class SessionManager:
                 self.message_queue.get(), timeout=timeout
             )
         except asyncio.TimeoutError:
-            logger.warning("No message received within timeout")
+            logger.debug("No message received within timeout")
             return None
 
         msg_type, payload, nonce, hmac_tag = unpack_message(raw_incoming_bytes)
@@ -287,7 +255,7 @@ class SessionManager:
         entry.signature_verified = False  # We don't verify signatures in receive for now
         self.logger.log_entry(entry)
 
-        logger.info(f"Message received: {plaintext[:50]}...")
+        logger.debug(f"Message received: {plaintext[:50]}...")
 
         return plaintext
 

@@ -49,53 +49,57 @@ async def run_chat_session(args):
 
         await session.run_handshake()
 
-        # Chat loop
-        print("\n📝 Chat ready! Type 'quit' to exit.")
-        print("   Type your message and press Enter to send\n")
+        # Chat ready
+        print("\n" + "═"*50)
+        print("💬 SECURE CHAT ESTABLISHED")
+        print("═"*50)
+        print("Type your message and press Enter. Type 'quit' to exit.\n")
 
-        # Create a task for receiving messages in the background
-        receive_task = None
-        pending_message = None
-
-        while True:
-            # Get user input in a non-blocking way
+        # Define a background task for receiving messages
+        async def message_receiver():
             try:
-                user_input = await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(None, input, "You: "),
-                    timeout=0.5,
-                )
+                while True:
+                    # Wait indefinitely for a message
+                    message = await session.receive_message(timeout=3600) 
+                    if message:
+                        # Print peer message and restore prompt
+                        print(f"\r🤖 Peer: {message}")
+                        print("You: ", end="", flush=True)
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error(f"Error in receiver task: {e}")
 
-                if user_input.lower() == "quit":
-                    print("\n👋 Goodbye!")
-                    break
+        # Start the receiver task
+        receiver_task = asyncio.create_task(message_receiver())
 
-                if user_input.strip():
-                    # Send message
-                    await session.send_message(user_input)
+        # Main loop for user input
+        while True:
+            # Use run_in_executor for non-blocking input
+            user_input = await asyncio.get_event_loop().run_in_executor(
+                None, input, "You: "
+            )
 
-            except asyncio.TimeoutError:
-                # No input available, check for received messages
-                if receive_task is None or receive_task.done():
-                    receive_task = asyncio.create_task(session.receive_message(timeout=1))
+            if user_input.lower() == "quit":
+                print("\n👋 Goodbye!")
+                break
 
-                # Check if we have a received message
-                if receive_task and receive_task.done():
-                    try:
-                        pending_message = receive_task.result()
-                        if pending_message:
-                            print(f"\n🤖 Peer: {pending_message}")
-                            print("You: ", end="", flush=True)
-                        receive_task = None
-                    except Exception as e:
-                        logger.error(f"Error receiving message: {e}")
-                        receive_task = None
+            if user_input.strip():
+                # Send message
+                await session.send_message(user_input)
 
-    except KeyboardInterrupt:
-        print("\n\n👋 Interrupted by user")
+        # Stop receiving
+        receiver_task.cancel()
+        try:
+            await receiver_task
+        except asyncio.CancelledError:
+            pass
 
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        # Re-raise to let the top-level handler take care of it
+        raise
     except Exception as e:
         logger.error(f"Error during chat: {e}", exc_info=True)
-
     finally:
         # Clean shutdown
         await session.stop()
@@ -200,4 +204,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n[Main] 👋 Shutting down...")
-        sys.exit(0)
+        # Forceful exit to ensure no dangling threads keep the terminal open
+        os._exit(0)
